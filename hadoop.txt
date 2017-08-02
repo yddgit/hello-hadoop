@@ -1,0 +1,224 @@
+Hadoop入门
+
+================================
+
+# 大数据生态系统
+
+1. 存储：hadoop HDFS
+2. 计算引擎
+   Map/Reduce v1
+   Map/Reduce v2(Map/Reduce on Yarn)
+   Tez
+   Spark
+3. Impala Presto Drill直接运行在HDFS上
+   pig(脚本方式) hive(SQL语言) 运行在Map/Reduce上
+   hive on Tez / SparkSQL
+4. 流式计算Storm
+5. KV Store
+   Cassandra
+   MongoDB
+   HBase
+6. Tensorflow
+   Mahout
+7. Zookeeper
+   Protobuf
+8. Sqoop
+   Kafka
+   Flume
+   ...
+
+================================
+
+# 安装JDK和hadoop
+
+1.安装虚拟机，使用CentOS系统，虚拟机网络使用host-only模式
+  vim /etc/sysconfig/network
+    NETWORKING=yes
+    GATEWAY=192.168.56.1
+  vim /etc/sysconfig/network-scripts/ifcfg-enp0s3
+    TYPE=Ethernet
+    IPADDR=192.168.56.10
+    NETMASK=255.255.255.0
+  修改主机名，主机名不要包含下划线
+    hostnamectl set-hostname master
+  如果需要虚拟机联网，还需要配置/etc/resolv.conf
+  重启网络：service network restart
+
+2.将JDK和hadoop安装包上线到虚拟机/usr/local目录
+  安装JDK
+    rpm -ivh jdk-8u65-linux-x64.rpm
+  安装hadoop
+    tar -xvf hadoop-2.7.3.tar.gz
+    mv hadoop-2.7.3 hadoop
+
+3.设置环境变量
+  新建/etc/profile.d/java.sh，写入如下内容
+    export JAVA_HOME=/usr/java/default
+    export CLASSPATH=.:${JAVA_HOME}/lib
+  *若不设置JAVA_HOME环境变量则要修改/usr/local/hadoop/etc/hadoop/hadoop-env.sh
+    export JAVA_HOME=/usr/java/default
+  新建/etc/profile.d/hadoop.sh，写入如下内容
+    export PATH=${PATH}:/usr/local/hadoop/bin:/usr/local/hadoop/sbin
+  关闭防火墙
+    systemctl stop firewalld.service
+    systemctl disable firewalld.service
+  修改/etc/hosts，使得主机名可以互相ping通
+    192.168.56.10 master
+    192.168.56.11 slave1
+    192.168.56.12 slave2
+    192.168.56.13 slave3
+  重启操作系统后验证hadoop命令是否可用
+
+4.复制以上虚拟机，分别修改IP/主机名信息
+
+================================
+
+# 启动/停止hadoop集群
+
+1.HDFS架构[理解NameNode和DataNode]
+  NameNode
+  - 存储文件系统元数据（文件目录结构、分块情况、每块位置、权限等）
+  - 这部分元数据存储在内存中，因此要求内存比较大
+  DataNode
+  - 存储数据块（block），默认1block=128M（即使文件小于128M）
+  - hadoop适合存储大文件
+  - 大于128M的文件会进行分block，默认每个block在不同的DataNode上共存储三份
+
+2.所有虚拟机修改配置/usr/local/hadoop/etc/hadoop/core-site.xml
+  <property>
+    <name>fs.defaultFS</name>
+    <value>hdfs://master:9000</value>
+  </property>
+
+3.在虚拟机master上启动NameNode
+  hdfs namenode -format
+  hadoop-daemon.sh start namenode
+  此时终端输出默认日志输出路径/usr/local/hadoop/logs/hadoop-root-namenode-master.out
+  jps查看后台运行任务中是否有NameNode进程
+
+4.在虚拟机slave*上启动DataNode
+  hadoop-daemon.sh start datanode
+  此时终端输出默认日志输出路径/usr/local/hadoop/logs/hadoop-root-datanode-slave*.out
+  jps查看后台运行任务中是否有DataNode进程
+
+5.以上启动的hadoop集群
+  物理架构：master + slave1 + slave2 + slave3
+  逻辑架构：namenode + datanode1 + datanode2 + datanode3
+
+6.查看当前集群状态
+  命令：hdfs dfsadmin -report
+  网页：http://master:50070/
+
+7.停止hadoop集群
+  停止NameNode：hadoop-daemon.sh stop namenode
+  停止DataNode：hadoop-daemon.sh stop datanode
+
+8.集中管理hadoop集群
+  编辑/usr/local/hadoop/etc/hadoop/slaves，将所有slave主机名写入该配置文件，一个主机名一行
+  使用命令启动/停止整个集群
+  - 启动：start-dfs.sh（需要输入master和所有slave的主机密码）
+  - 停止：stop-dfs.sh（需要输入master和所有slave的主机密码）
+
+9.配置master到slave的免密登录
+  为master生成ssh-key：ssh-keygen -t rsa
+  将master公钥复制到master的.ssh/authorized_keys文件：ssh-copy-id master
+  将master的公钥复制到所有slave主机上：
+    ssh-copy-id slave1
+    ssh-copy-id slave2
+    ssh-copy-id slave3
+  再次尝试运行start-dfs.sh和stop-dfs.sh就不需要输入密码了
+
+================================
+
+# 访问HDFS
+
+1.操作HDFS的命令[hadoop fs]或[hdfs dfs]
+  hadoop fs -ls /
+  hadoop fs -put test.txt /
+  hadoop fs -text /test.txt
+  hdfs dfs -rm -f /test.txt
+  hdfs dfs -mkdir /tmp
+  hdfs dfs -rm -r -f /tmp
+
+2.修改/usr/local/hadoop/etc/hadoop/hdfs-site.xml中的dfs.replication选项为2
+  参考hadoop文档：hadoop-2.7.3/share/doc/hadoop/index.html中的hdfs-default.xml
+  <property>
+    <name>dfs.replication</name>
+    <value>2</value>
+  </property>
+  重启hadoop集群，上传文件apache-hive-2.1.1-bin.tar.gz到hadoop
+  查看replication和block存储状态
+  - replication应为2，文件被分为两个block，分别存储在不同的slave上
+  - 如：block0存储在slave1/slave3，block1存储在slave1/slave2
+
+3.修改/usr/local/hadoop/etc/hadoop/hdfs-site.xml中的心跳检测间隔时间
+  dfs.namenode.heartbeat.recheck-interval选项为10000(ms)，该值默认为300000(ms)
+  然后停掉一个DataNode，如：slave3，通过网页查看DataNode和文件block的复制情况
+  <property>
+    <name>dfs.namenode.heartbeat.recheck-interval</name>
+    <value>10000</value>
+  </property>
+
+4.Java访问HDFS
+
+  HDFS系统会把用到的数据存储在core-site.xml中hadoop.tmp.dir指定的目录，默认位于/tmp/hadoop-${user.name}
+  由于/tmp目录下的文件在系统重启时会被删除，所以应该修改目录位置，修改所有结点的core-site.xml
+  <property>
+    <name>hadoop.tmp.dir</name>
+    <value>/var/hadoop</value>
+  </property>
+
+  上传一个测试文件到HDFS
+  hadoop fs -put test.txt /
+
+  通过Java访问HDFS时将集群看作一个大的系统磁盘即可
+
+  因为windows和linux上的权限系统的区别，测试期间关闭权限检查
+  修改NameNode上的/usr/local/hadoop/etc/hadoop/hdfs-site.xml
+  <property>
+    <name>dfs.permissions.enabled</name>
+    <value>false</value>
+  </property>
+  然后重启NameNode
+  hadoop-daemon.sh stop  namenode
+  hadoop-daemon.sh start namenode
+  也可以通过设置环境变量HADOOP_USER_NAME=root来解决这个问题
+
+  Hadoop权限控制：Kerberos
+
+  读取HDFS上的文件：
+  URL.setURLStreamHandlerFactory(new FsUrlStreamHandlerFactory());
+  URL url = new URL("hdfs://192.168.56.10:9000/test.txt");
+  InputStream in = url.openStream();
+  IOUtils.copyBytes(in, System.out, 4096, true);
+
+  使用FileSystem类
+  Configuration conf = new Configuration();
+  conf.set("fs.defaultFS", "hdfs://192.168.56.10:9000");
+  conf.set("dfs.replication", "2"); //设置dfs.replication属性
+  FileSystem fileSystem = FileSystem.get(conf);
+
+  创建删除目录，判断目录是否存在
+  fileSystem.exists(new Path("/hello"));
+  fileSystem.mkdirs(new Path("/ydd"));
+  fileSystem.delete(new Path("/ydd"), true);
+  fileSystem.exists(new Path("/ydd"));
+
+  上传文件到HDFS1
+  FSDataOutputStream out = fileSystem.create(new Path("/test.data"), true);
+  FileInputStream fis = new FileInputStream("hadoop.txt");
+  IOUtils.copyBytes(fis, out, 4096, true);
+
+================================
+
+# Hadoop基础回顾
+
+1.Hadoop组件
+  HDFS、Yarn、MapReduce
+2.HDFS包括
+  NameNode
+  DataNode
+  SecondaryNameNode
+  JournalNode
+  HDFS典型应用：网盘
+
