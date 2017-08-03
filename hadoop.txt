@@ -44,7 +44,7 @@ Hadoop入门
   如果需要虚拟机联网，还需要配置/etc/resolv.conf
   重启网络：service network restart
 
-2.将JDK和hadoop安装包上线到虚拟机/usr/local目录
+2.将JDK和hadoop安装包上传到虚拟机/usr/local目录
   安装JDK
     rpm -ivh jdk-8u65-linux-x64.rpm
   安装hadoop
@@ -221,4 +221,9 @@ Hadoop入门
   SecondaryNameNode
   JournalNode
   HDFS典型应用：网盘
+3.其他内容
+  安全与权限Kerberos
+  SecondaryNameNode -> CheckPointNameNode
+  HA实现 -> JournalNode
+  Federation -> 超大规模数据中心
 
