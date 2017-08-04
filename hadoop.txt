@@ -70,6 +70,12 @@ Hadoop入门
   重启操作系统后验证hadoop命令是否可用
 
 4.复制以上虚拟机，分别修改IP/主机名信息
+  修改C:\Windows\System32\drivers\etc\hosts，添加如下内容
+    192.168.56.10 master
+    192.168.56.11 slave1
+    192.168.56.12 slave2
+    192.168.56.13 slave3  
+  即可使用主机名访问虚拟机中的服务
 
 ================================
 
@@ -226,4 +232,120 @@ Hadoop入门
   SecondaryNameNode -> CheckPointNameNode
   HA实现 -> JournalNode
   Federation -> 超大规模数据中心
+
+================================
+
+# 计算调度系统Yarn
+
+1.分布式计算
+  设计原则：移动计算，而不是移动数据
+
+2.计算调度Yarn
+
+  两个组件：ResourceManager(管理Job) + NodeManager(执行计算)
+  类似HDFS的NameNode和DataNode
+  通常NameNode和ResourceManager分开部署，DataNode和NodeManager就近或部署在一起
+
+3.启动Yarn
+  - 配置master和所有slave上的/usr/local/hadoop/etc/hadoop/yarn-site.xml
+    <property>
+      <name>yarn.resourcemanager.hostname</name>
+      <value>master</value>
+    </property>
+    <property>
+      <name>yarn.nodemanager.aux-services</name>
+      <value>mapreduce_shuffle</value>
+    </property>
+    <property>
+      <name>yarn.nodemanager.aux-services.mapreduce_shuffle.class</name>
+      <value>org.apache.hadoop.mapred.ShuffleHandler</value>
+    </property>
+    注：yarn-site.xml如果是集中启动，只需要在ResourceManager上配置一份即可
+    若单独启动，需要每台机器都配置，在网页上可以看到当前机器的配置以及这个配置的来源
+  - 执行命令启动：start-yarn.sh
+    以上启动命令会检查slaves文件中的主机，在其上启动NodeManager
+  - 通过网页查看Yarn状态：http://master:8088/
+  - 可以使用yarn-daemon.sh单独启动resourcemanager和nodemanager
+
+4.启动Yarn不以HDFS启动为前提，执行MapReduce也不依赖Yarn
+
+5.在Yarn上执行一个示例任务
+  - 配置master上的/usr/local/hadoop/etc/hadoop/mapred-site.xml
+    <property>
+      <name>mapreduce.framework.name</name>
+      <value>yarn</value><!-- 默认是local -->
+    </property>
+  - 上传一个测试文件到HDFS
+    vim input.txt
+      hello java
+      hello java
+      hello c
+      hello scala
+      hello kotlin
+      hello c++
+      hello python
+      hello java
+      hello c#
+      hello perl
+    hadoop fs -mkdir /input
+    hadoop fs -put input.txt /input/
+  - 查找hadoop安装目录下的示例程序
+    find /usr/local/hadoop/ -name *example*.jar
+    /usr/local/hadoop/share/hadoop/mapreduce/hadoop-mapreduce-examples-2.7.3.jar
+  - 执行MapReduce示例WordCount，统计/input/input.txt中的单词数量
+    hadoop jar /usr/local/hadoop/share/hadoop/mapreduce/hadoop-mapreduce-examples-2.7.3.jar wordcount /input/input.txt /output
+  - 查看控制台输出的JobID
+  - 通过网页查询Yarn中Application的状态，以及任务执行状态
+  - 执行完成后在HDFS的/output目录查看执行结果
+    任务执行成功：_SUCCESS
+    任务执行结果：part-r-00000
+    hadoop fs -text /output/part-r-00000
+      c         1
+      c#        1
+      c++       1
+      hello     10
+      java      3
+      kotlin    1
+      perl      1
+      python    1
+      scala     1
+
+================================
+
+# 计算引擎Map/Reduce
+
+1.WordCount工作过程
+  input  : 输入，input.txt的内容
+  split  : 拆分，默认按行拆分，形成K-V对（起始位置->数据行）
+  map    : 映射，计算split结果中的数据行，形成K-V对（单词->1，可能存在的缩减：单词->n）
+  shuffle: 派发，将map的结果分发到各结点进行计算（单词->[1,1,n,1,...]）
+  reduce : 缩减，对shuffle过程分发过来的数据进行缩减计算得到结果（单词->数量）
+  output : 输出，最终结果
+
+2.Java开发MpaReduce程序
+
+  配置环境变量
+  - HADOOP_HOME=hadoop的安装目录(路径不要包含空格或中文)
+  - 为方便操作，将%HADOOP_HOME%\bin添加到Path环境变量
+
+  对于windows系统，需要添加windows的库文件
+  - 将Windows库文件覆盖到%HADOOP_HOME%\bin
+  - 若有问题，可将hadoop.dll复制到C:\Windows\System32目录
+  设置系统环境变量HADOOP_USER_NAME=root
+
+  Map代码：src/main/java/com/my/project/WordMapper.java
+  Reduce代码：src/main/java/com/my/project/WordReducer.java
+  MapReduce测试代码：src/test/java/com/my/project/TestMapReduce.java
+
+  在远程Yarn上执行MapReduce程序时除了使用conf.setXXX设置相关属性
+    conf.set("fs.defaultFS", "hdfs://192.168.56.10:9000/");
+    conf.set("mapreduce.job.jar", "target/hello-hadoop-0.0.1.jar");
+    conf.set("mapreduce.framework.name", "yarn");
+    conf.set("yarn.resourcemanager.hostname", "192.168.56.10");
+    conf.set("mapreduce.app-submission.cross-platform", "true");
+  也可以将hadoop的四个配置文件加到src/main/resources目录
+    core-site.xml
+    hdfs-site.xml
+    mapred-site.xml
+    yarn-site.xml
 
