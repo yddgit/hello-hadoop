@@ -269,7 +269,7 @@ Hadoop入门
 
 4.启动Yarn不以HDFS启动为前提，执行MapReduce也不依赖Yarn
 
-5.在Yarn上执行一个测试任务
+5.在Yarn上执行一个示例任务
   - 配置master上的/usr/local/hadoop/etc/hadoop/mapred-site.xml
     <property>
       <name>mapreduce.framework.name</name>
@@ -318,7 +318,34 @@ Hadoop入门
   input  : 输入，input.txt的内容
   split  : 拆分，默认按行拆分，形成K-V对（起始位置->数据行）
   map    : 映射，计算split结果中的数据行，形成K-V对（单词->1，可能存在的缩减：单词->n）
-  shuffle: 派发，将map的结果分发到各结点进行计算（单词->[1,1,1,1,...]）
+  shuffle: 派发，将map的结果分发到各结点进行计算（单词->[1,1,n,1,...]）
   reduce : 缩减，对shuffle过程分发过来的数据进行缩减计算得到结果（单词->数量）
   output : 输出，最终结果
+
+2.Java开发MpaReduce程序
+
+  配置环境变量
+  - HADOOP_HOME=hadoop的安装目录(路径不要包含空格或中文)
+  - 为方便操作，将%HADOOP_HOME%\bin添加到Path环境变量
+
+  对于windows系统，需要添加windows的库文件
+  - 将Windows库文件覆盖到%HADOOP_HOME%\bin
+  - 若有问题，可将hadoop.dll复制到C:\Windows\System32目录
+  设置系统环境变量HADOOP_USER_NAME=root
+
+  Map代码：src/main/java/com/my/project/WordMapper.java
+  Reduce代码：src/main/java/com/my/project/WordReducer.java
+  MapReduce测试代码：src/test/java/com/my/project/TestMapReduce.java
+
+  在远程Yarn上执行MapReduce程序时除了使用conf.setXXX设置相关属性
+    conf.set("fs.defaultFS", "hdfs://192.168.56.10:9000/");
+    conf.set("mapreduce.job.jar", "target/hello-hadoop-0.0.1.jar");
+    conf.set("mapreduce.framework.name", "yarn");
+    conf.set("yarn.resourcemanager.hostname", "192.168.56.10");
+    conf.set("mapreduce.app-submission.cross-platform", "true");
+  也可以将hadoop的四个配置文件加到src/main/resources目录
+    core-site.xml
+    hdfs-site.xml
+    mapred-site.xml
+    yarn-site.xml
 
