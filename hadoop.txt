@@ -349,3 +349,71 @@ Hadoop入门
     mapred-site.xml
     yarn-site.xml
 
+================================
+
+# Hive入门
+
+1.下载上传apache-hive-2.1.1-bin.tar.gz到master，解压到/usr/local/
+
+2.配置环境变量HADOOP_HOME和HIVE_HOME
+  vim /etc/profile.d/hadoop.sh
+    export HADOOP_HOME=/usr/local/hadoop
+    export PATH=${PATH}:${HADOOP_HOME}/bin:${HADOOP_HOME}/sbin
+  vim /etc/profile.d/hive.sh
+    export HIVE_HOME=/usr/local/hive
+    export PATH=${PATH}:${HIVE_HOME}/bin
+  重启master虚拟机
+
+3.修改配置文件hive-site.xml
+  cp hive-default.xml.template hive-site.xml
+  修改hive.metastore.schema.verification=false
+  mkdir /usr/local/hive/tmp
+  替换${system:java.io.tmpdir}为/usr/local/hive/tmp
+  替换${system:user.name}为root
+
+4.初始化元数据的数据库
+  schematool -initSchema -dbType derby
+  以上命令会在当前目录下建立metastore_db的数据库
+  注意：下一次启动hive时应该还在同一目录，默认到当前目录下寻找metastore
+  遇到问题，把metastore_db删除，重新执行命令即可
+  实际工作环境中，经常使用mysql作为metastore的数据
+
+5.先启动HDFS，再启动hive：hive
+  show databases;
+  use default;
+  show tables;
+  create table doc(line string);
+  desc doc;
+  select * from doc;
+  drop table doc;
+  exit;
+
+  注意：
+  - 启动中日志输出：Hive-on-MR is deprecated in Hive 2 and may not be available in the future versions.
+    Consider using a different execution engine (i.e. spark, tez) or using Hive 1.X releases.
+  - 可以在hive中执行命令查看HDFS上的文件：dfs -ls /user/hive/warehouse/doc/;
+
+6.启动Yarn，执行示例程序
+  load data inpath '/input/' overwrite into table doc; //注意这里并没有copy数据，只是将数据和表做了关联
+  select * from doc;
+  select split(line, ' ') from doc;
+  select explode(split(line, ' ')) from doc;
+  select word, count(1) as count from (select explode(split(line, ' ')) as word from doc) w group by word;
+  create table word_counts as select word, count(1) as count from (select explode(split(line, ' ')) as word from doc) w group by word;
+  select * from word_counts;
+  dfs -ls /user/hive/warehouse/word_counts/
+
+7.使用Sougou搜索日志做实验，统计热搜榜
+  将日志文件上传到HDFS，启动hive
+  create table sougou(qtime string, qid string, qword string, url string) row format delimited fields terminated by ',';
+  load data inpath '/sougou.dic' into table sougou; //注意这里并没有copy数据，只是将数据和表做了关联
+  select count(*) from sougou;
+  create table sougou_results as select keyword, count(1) as count from (select qword as keyword from sougou) t group by keyword order by count desc;
+  select * from sougou_results limit 10;
+
+8.HiveQL的翻译引擎，用类似SQL语言的方式做计算
+  将SQL语句查询，转换为MapReduce操作，省去Java编程
+  应用场合：静态数据分析，数据不会频繁变化，不需要实时结果响应
+  不支持行级的插入/删除操作，不支持事务
+  注：测试中发现load data时源文件会被移动到/user/hive/warehouse/[table_name]/下，但实际数据块并没有发生移动，如果drop了表则数据文件也会被一并删除
+
