@@ -417,3 +417,76 @@ Hadoop入门
   不支持行级的插入/删除操作，不支持事务
   注：测试中发现load data时源文件会被移动到/user/hive/warehouse/[table_name]/下，但实际数据块并没有发生移动，如果drop了表则数据文件也会被一并删除
 
+================================
+
+# Spark入门
+
+1.内存计算引擎，使用Scala开发，支持Java/Scala/Python开发接口
+
+2.运行模式
+
+  local模式
+
+  - 使用spark-submit提交job
+      cd /usr/local/spark
+      ./bin/spark-submit --class org.apache.spark.examples.SparkPi ./examples/jars/spark-examples_2.11-2.2.0.jar 10000
+    通过http://192.168.56.14:4040/查看job执行情况
+
+  - 使用spark-shell进行交互式提交（spark-shell不加参数默认进入local模式）
+      ./bin/spark-shell
+    再次连接一个terminal，用jps观察进程，会看到spark-submit进程
+    获取命令帮助
+      :help
+    退出spark-shell
+      :quit
+
+  - 使用Scala编程的方式执行WordCount，可通过http://192.168.56.14:4040/观察命令执行情况
+      sc
+      val lineRDD = sc.textFile("/root/hello.txt")
+      lineRDD.foreach(println)
+      lineRDD.collect
+      val wordRDD = lineRDD.flatMap(line => line.split(" "))
+      wordRDD.collect
+      val wordCountRDD = wordRDD.map(word => (word, 1))
+      wordCountRDD.collect
+      val resultRDD = wordCountRDD.reduceByKey((x, y) => x + y)
+      resultRDD.collect
+      var orderedRDD = resultRDD.sortByKey()
+      orderedRDD.collect
+    将执行结果写到/root/result/目录
+      orderedRDD.saveAsTextFile("/root/result")
+    简单写法
+      sc.textFile("/root/hello.txt").flatMap(_.split(" ")).map((_,1)).reduceByKey(_+_).sortByKey().collect
+
+  - 使用local模式访问HDFS数据
+    启动HDFS：start-dfs.sh
+    在spark-shell中执行以下命令：
+      sc.textFile("hdfs://192.168.56.10:9000/input/input.txt").flatMap(_.split(" ")).map((_,1)).reduceByKey(_+_).sortByKey().saveAsTextFile("hdfs://192.168.56.10:9000/output3")
+    在HDFS上查看执行结果：hadoop fs -cat /output3/part-00000
+
+  standalone模式
+  
+  - 在master和所有slave上解压spark
+  - 修改master上conf/slaves文件，加入slave主机名
+  - 修改conf/spark-env.sh，export SPARK_MASTER_HOST=master
+  - 将spark-env.sh复制到每一台slave
+  - cd /usr/local/spark
+  - ./sbin/start-all.sh
+  - 在spark测试主机上执行：./bin/spark-shell --master spark://192.168.56.10:7077（也可以使用配置文件）
+      sc.textFile("hdfs://192.168.56.10:9000/input/input.txt").flatMap(_.split(" ")).map((_,1)).reduceByKey(_+_).sortByKey().saveAsTextFile("hdfs://192.168.56.10:9000/output4")
+    在HDFS上查看执行结果
+      hadoop fs -ls /output4
+  - 观察http://192.168.56.10:8080/
+
+  yarn模式
+
+  - TODO Learn spark on yarn
+
+  mesos模式
+
+  - TODO Learn spark on mesos
+
+3.核心概念RDD（弹性分布式数据集）
+
+  通过spark-shell认识RDD(Resillient Distributed Dataset)
+
