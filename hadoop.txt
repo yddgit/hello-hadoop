@@ -134,6 +134,136 @@ Hadoop入门
     ssh-copy-id slave3
   再次尝试运行start-dfs.sh和stop-dfs.sh就不需要输入密码了
 
+10.配置NameNode HA with QJM
+
+  https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-hdfs/HDFSHighAvailabilityWithQJM.html
+
+  NameNode1: master
+  NameNode2: slave1
+  JournalNode: slave1, slave2, slave3
+  Zookeeper: slave1, slave2, slave3
+
+  先启动Zookeeper集群
+
+  所有虚拟机创建目录:
+  /usr/local/hadoop/journal
+  /usr/local/hadoop/hdfs/name
+  /usr/local/hadoop/hdfs/data
+
+  所有虚拟机修改/usr/local/hadoop/etc/hadoop/hdfs-site.xml
+  <property>
+    <name>dfs.nameservices</name>
+    <value>mycluster</value>
+  </property>
+  <property>
+    <name>dfs.ha.namenodes.mycluster</name>
+    <value>nn1,nn2</value>
+  </property>
+  <property>
+    <name>dfs.namenode.rpc-address.mycluster.nn1</name>
+    <value>master:8020</value>
+  </property>
+  <property>
+    <name>dfs.namenode.rpc-address.mycluster.nn2</name>
+    <value>slave1:8020</value>
+  </property>
+  <property>
+    <name>dfs.namenode.http-address.mycluster.nn1</name>
+    <value>master:50070</value>
+  </property>
+  <property>
+    <name>dfs.namenode.http-address.mycluster.nn2</name>
+    <value>slave1:50070</value>
+  </property>
+  <property>
+    <name>dfs.namenode.shared.edits.dir</name>
+    <value>qjournal://slave1:8485;slave2:8485;slave3:8485/mycluster</value>
+  </property>
+  <property>
+    <name>dfs.client.failover.proxy.provider.mycluster</name>
+    <value>org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider</value>
+  </property>
+  <property>
+    <name>dfs.ha.fencing.methods</name>
+    <value>sshfence(root:22)</value>
+  </property>
+  <property>
+    <name>dfs.ha.fencing.ssh.private-key-files</name>
+    <value>/root/.ssh/id_rsa</value><!-- without passphrase -->
+  </property>
+  <property>
+    <name>dfs.journalnode.edits.dir</name>
+    <value>/usr/local/hadoop/journal</value>
+  </property>
+  <property>
+    <name>dfs.ha.automatic-failover.enabled</name>
+    <value>true</value>
+  </property>
+  <property>
+    <name>dfs.namenode.name.dir</name>
+    <value>/usr/local/hadoop/hdfs/name</value>
+  </property>
+  <property>
+    <name>dfs.datanode.data.dir</name>
+    <value>/usr/local/hadoop/hdfs/data</value>
+  </property>
+  <property>
+    <name>dfs.webhdfs.enabled</name>
+    <value>true</value>
+  </property>
+
+  所有虚拟机修改/usr/local/hadoop/etc/hadoop/core-site.xml
+  <property>
+    <name>fs.defaultFS</name>
+    <value>hdfs://mycluster</value>
+  </property>
+  <property>
+    <name>ha.zookeeper.quorum</name>
+    <value>slave1:2181,slave2:2181,slave3:2181</value>
+  </property>
+  <property>
+    <name>hadoop.tmp.dir</name>
+    <value>/var/hadoop</value>
+  </property>
+  <property>
+    <name>hadoop.proxyuser.root.hosts</name>
+    <value>*</value>
+   </property>
+   <property>
+    <name>hadoop.proxyuser.root.groups</name>
+    <value>*</value>
+  </property>
+
+  在master上执行如下命令, 在Zookeeper上创建结点
+    hdfs zkfc -formatZK
+  在slave1, slave2, slave3上启动JournalNode
+    hadoop-daemon.sh start journalnode
+  在master上格式化NameNode
+    hdfs namenode -format
+  在master上启动主NameNode
+    hadoop-daemon.sh start namenode
+  在slave1上启动备NameNode
+    hdfs namenode -bootstrapStandby
+	hadoop-daemon.sh start namenode
+  在master上查看NameNode状态
+    hdfs haadmin -getAllServiceState
+  在master上模拟主备切换
+    hdfs haadmin -transitionToActive --forcemanual nn1
+    hdfs haadmin -transitionToStandby --forcemanual nn1
+  在slave1, slave2, slave3上启动DataNode
+    hadoop-daemon.sh start datanode
+  停止NameNode, DataNode, JournalNode
+    master:
+	  hadoop-daemon.sh stop namenode
+    slave1:
+	  hadoop-daemon.sh stop namenode
+    slave1, slave2, slave3:
+	  hadoop-daemon.sh stop datanode
+    slave1, slave2, slave3:
+      hadoop-daemon.sh stop journalnode
+  启动HDFS
+    start-dfs.sh
+
 ================================
 
 # 访问HDFS
@@ -309,6 +439,77 @@ Hadoop入门
       perl      1
       python    1
       scala     1
+
+6. 配置ResourceManager HA
+
+  https://hadoop.apache.org/docs/current/hadoop-yarn/hadoop-yarn-site/ResourceManagerHA.html
+
+  配置master和所有slave上的/usr/local/hadoop/etc/hadoop/yarn-site.xml
+
+  <property>
+    <name>yarn.nodemanager.aux-services</name>
+    <value>mapreduce_shuffle</value>
+  </property>
+  <property>
+    <name>yarn.nodemanager.aux-services.mapreduce_shuffle.class</name>
+    <value>org.apache.hadoop.mapred.ShuffleHandler</value>
+  </property>
+  <property>
+    <name>yarn.resourcemanager.ha.enabled</name>
+    <value>true</value>
+  </property>
+  <property>
+    <name>yarn.resourcemanager.ha.automatic-failover.enabled</name>
+    <value>true</value>
+  </property>
+  <property>
+    <name>yarn.resourcemanager.cluster-id</name>
+    <value>cluster1</value>
+  </property>
+  <property>
+    <name>yarn.resourcemanager.ha.rm-ids</name>
+    <value>rm1,rm2</value>
+  </property>
+  <property>
+    <name>yarn.resourcemanager.hostname.rm1</name>
+    <value>master</value>
+  </property>
+  <property>
+    <name>yarn.resourcemanager.hostname.rm2</name>
+    <value>slave1</value>
+  </property>
+  <property>
+    <name>yarn.resourcemanager.webapp.address.rm1</name>
+    <value>master:8088</value>
+  </property>
+  <property>
+    <name>yarn.resourcemanager.webapp.address.rm2</name>
+    <value>slave1:8088</value>
+  </property>
+  <property>
+    <name>yarn.resourcemanager.zk-address</name>
+    <value>slave1:2181,slave2:2181,slave3:2181</value>
+  </property>
+  <property>
+    <name>yarn.resourcemanager.recovery.enabled</name>
+    <value>true</value>
+  </property>
+  <property>
+    <name>yarn.resourcemanager.store.class</name>
+    <value>org.apache.hadoop.yarn.server.resourcemanager.recovery.ZKRMStateStore</value>
+  </property>
+
+  在master上启动Yarn:
+    start-yarn.sh
+  在slave1上启动备ResourceManager:
+    yarn-daemon.sh start resourcemanager
+  查看ResourceManager HA状态
+    yarn rmadmin -getServiceState rm1
+	yarn rmadmin -getServiceState rm2
+	yarn rmadmin -getAllServiceState
+  在master上模拟主备切换
+	yarn rmadmin -transitionToStandby --forcemanual rm1
+	yarn rmadmin -transitionToActive --forcemanual rm2
 
 ================================
 
