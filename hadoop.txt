@@ -183,10 +183,17 @@ Hadoop入门
     <name>dfs.client.failover.proxy.provider.mycluster</name>
     <value>org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider</value>
   </property>
+  <!--
+    A list of scripts or Java classes which will be used to fence the Active NameNode during a failover
+    1. sshfence: SSH to the Active NameNode and kill the process
+	2. shell: run an arbitrary shell command to fence the Active NameNode
+  -->
   <property>
     <name>dfs.ha.fencing.methods</name>
-    <value>sshfence(root:22)</value>
+    <!--<value>sshfence(root:22)</value>-->
+	<value>shell(/bin/true)</value>
   </property>
+  <!-- for sshfence -->
   <property>
     <name>dfs.ha.fencing.ssh.private-key-files</name>
     <value>/root/.ssh/id_rsa</value><!-- without passphrase -->
