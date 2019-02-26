@@ -513,6 +513,10 @@ Hadoop入门
     <name>yarn.log-aggregation-enable</name>
     <value>true</value>
   </property>
+  <property>
+    <name>yarn.nodemanager.vmem-pmem-ratio</name>
+    <value>4</value>
+  </property>
 
   在master上启动Yarn:
     start-yarn.sh
@@ -588,6 +592,16 @@ Hadoop入门
   在master上启停JobHistoryServer
     mr-jobhistory-daemon.sh start historyserver
     mr-jobhistory-daemon.sh stop historyserver
+
+4.调整map/reduce内存参数
+  <property>
+    <name>mapreduce.map.java.opts</name>
+    <value>-Xmx512m</value>
+  </property>
+  <property>
+    <name>mapreduce.reduce.java.opts</name>
+    <value>-Xmx512m</value>
+  </property>
 
 ================================
 
