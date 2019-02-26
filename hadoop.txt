@@ -561,6 +561,30 @@ Hadoop入门
     mapred-site.xml
     yarn-site.xml
 
+3.配置MapReduce的JobHistoryServer
+
+  修改所有结点mapred-site.xml，添加如下内容
+  <property>
+    <name>mapreduce.jobhistory.address</name>
+    <value>master:10020</value>
+  </property>
+  <property>
+    <name>mapreduce.jobhistory.webapp.address</name>
+    <value>master:19888</value>
+  </property>
+  <property>
+    <name>mapreduce.jobhistory.intermediate-done-dir</name>
+    <value>/tmp/hadoop-yarn/staging/history/done_intermediate</value>
+  </property>
+  <property>
+    <name>mapreduce.jobhistory.done-dir</name>
+    <value>/tmp/hadoop-yarn/staging/history/done</value>
+  </property>
+
+  在master上启停JobHistoryServer
+    mr-jobhistory-daemon.sh start historyserver
+    mr-jobhistory-daemon.sh stop historyserver
+
 ================================
 
 # Hive入门
