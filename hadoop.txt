@@ -186,12 +186,12 @@ Hadoop入门
   <!--
     A list of scripts or Java classes which will be used to fence the Active NameNode during a failover
     1. sshfence: SSH to the Active NameNode and kill the process
-	2. shell: run an arbitrary shell command to fence the Active NameNode
+    2. shell: run an arbitrary shell command to fence the Active NameNode
   -->
   <property>
     <name>dfs.ha.fencing.methods</name>
     <!--<value>sshfence(root:22)</value>-->
-	<value>shell(/bin/true)</value>
+    <value>shell(/bin/true)</value>
   </property>
   <!-- for sshfence -->
   <property>
@@ -514,6 +514,14 @@ Hadoop入门
     <value>true</value>
   </property>
   <property>
+    <name>yarn.log.server.url</name>
+    <value>http://dev0:19888/jobhistory/logs</value>
+  </property>
+  <property>
+    <name>yarn.nodemanager.remote-app-log-dir</name>
+    <value>/tmp/logs</value>
+  </property>
+  <property>
     <name>yarn.nodemanager.vmem-pmem-ratio</name>
     <value>4</value>
   </property>
@@ -574,11 +582,11 @@ Hadoop入门
   修改所有结点mapred-site.xml，添加如下内容
   <property>
     <name>mapreduce.jobhistory.address</name>
-    <value>master:10020</value>
+    <value>master:10020</value><!-- 提交job时可覆盖 -->
   </property>
   <property>
     <name>mapreduce.jobhistory.webapp.address</name>
-    <value>master:19888</value>
+    <value>master:19888</value><!-- 提交job时可覆盖 -->
   </property>
   <property>
     <name>mapreduce.jobhistory.intermediate-done-dir</name>
@@ -587,6 +595,18 @@ Hadoop入门
   <property>
     <name>mapreduce.jobhistory.done-dir</name>
     <value>/tmp/hadoop-yarn/staging/history/done</value>
+  </property>
+  <property>
+    <name>mapreduce.jobhistory.intermediate-done-dir</name>
+    <value>${yarn.app.mapreduce.am.staging-dir}/history/done_intermediate</value>
+  </property>
+  <property>
+    <name>mapreduce.jobhistory.done-dir</name>
+    <value>${yarn.app.mapreduce.am.staging-dir}/history/done</value>
+  </property>
+  <property>
+    <name>yarn.app.mapreduce.am.staging-dir</name>
+    <value>/user</value><!-- 提交job时可覆盖 -->
   </property>
 
   在master上启停JobHistoryServer
