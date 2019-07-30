@@ -12,3 +12,5 @@ log/
 .project
 .classpath
 /bin/
+.idea/
+*.iml
